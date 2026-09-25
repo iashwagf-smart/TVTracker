@@ -5,6 +5,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: write
+
 jobs:
   ipa:
     runs-on: macos-15
@@ -46,3 +49,13 @@ jobs:
           name: TVTracker-ipa
           path: build/TVTracker.ipa
           retention-days: 30
+
+      - name: Publish to "latest" release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: آخر نسخة
+          body: |
+            نسخة رقم ${{ github.run_number }} — نزّل TVTracker.ipa وافتحه في SideStore أو AltStore.
+          files: build/TVTracker.ipa
+          make_latest: true
