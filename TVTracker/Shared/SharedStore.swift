@@ -9,19 +9,20 @@ enum SharedStore {
 
     static let container: ModelContainer = {
         let schema = Schema([Show.self, Episode.self])
-        let config: ModelConfiguration
+        var configs: [ModelConfiguration] = []
         if let group = appGroup,
            FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: group) != nil {
-            config = ModelConfiguration(schema: schema, groupContainer: .identifier(group))
-        } else {
-            // لو الـ App Group مو مفعل، التطبيق يشتغل عادي بس الويدجت ما يشوف البيانات
-            config = ModelConfiguration(schema: schema, groupContainer: .none)
+            configs.append(ModelConfiguration(schema: schema, groupContainer: .identifier(group)))
         }
-        do {
-            return try ModelContainer(for: schema, configurations: config)
-        } catch {
-            fatalError("تعذر فتح قاعدة البيانات: \(error)")
+        // لو الـ App Group مو مفعل (مثل التثبيت عن طريق SideStore) نستخدم مجلد التطبيق العادي
+        configs.append(ModelConfiguration(schema: schema, groupContainer: .none))
+        for config in configs {
+            if let container = try? ModelContainer(for: schema, configurations: config) {
+                return container
+            }
         }
+        // آخر حل: قاعدة بيانات مؤقتة بالذاكرة بدل ما يقفل التطبيق
+        return try! ModelContainer(for: schema, configurations: ModelConfiguration(schema: schema, isStoredInMemoryOnly: true))
     }()
 
     // MARK: - علامات الويدجت
