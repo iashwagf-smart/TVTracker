@@ -13,6 +13,9 @@ struct ProfileView: View {
     @State private var showImporter = false
     @State private var message: String?
     @State private var isWorking = false
+    @State private var notificationsOn = EpisodeNotifications.isEnabled
+    @State private var showTVTimeImporter = false
+    @State private var importProgress: (done: Int, total: Int)?
 
     private var totalMinutes: Int { watched.reduce(0) { $0 + $1.effectiveRuntime } }
 
@@ -64,6 +67,46 @@ struct ProfileView: View {
                 }
 
                 Section {
+                    Toggle(isOn: $notificationsOn) {
+                        Label("إشعار لما تنزل حلقة جديدة", systemImage: "bell.badge.fill")
+                    }
+                    .onChange(of: notificationsOn) { _, on in
+                        guard on != EpisodeNotifications.isEnabled else { return }
+                        if on {
+                            Task {
+                                let granted = await EpisodeNotifications.enable(context: context)
+                                if !granted {
+                                    notificationsOn = false
+                                    message = "فعّل الإشعارات للتطبيق من الإعدادات"
+                                }
+                            }
+                        } else {
+                            EpisodeNotifications.disable()
+                        }
+                    }
+                } header: {
+                    Text("الإشعارات")
+                }
+
+                Section {
+                    Button {
+                        showTVTimeImporter = true
+                    } label: {
+                        Label("استيراد من TV Time", systemImage: "arrow.down.doc.fill")
+                    }
+                    .fileImporter(isPresented: $showTVTimeImporter,
+                                  allowedContentTypes: [.commaSeparatedText, .plainText],
+                                  allowsMultipleSelection: true) { result in
+                        guard case .success(let urls) = result, !urls.isEmpty else { return }
+                        importTVTime(urls)
+                    }
+                } header: {
+                    Text("TV Time")
+                } footer: {
+                    Text("اطلب نسخة من بياناتك من TV Time، فك الضغط، واختر ملفات CSV (مثل seen_episode.csv و followed_tv_show.csv). تقدر تختار أكثر من ملف مرة وحدة.")
+                }
+
+                Section {
                     Button {
                         do {
                             exportFile = ExportFile(url: try Library.exportBackup(from: context))
@@ -96,7 +139,21 @@ struct ProfileView: View {
             }
             .navigationTitle("حسابي")
             .disabled(isWorking)
-            .overlay { if isWorking { ProgressView().controlSize(.large) } }
+            .overlay {
+                if isWorking {
+                    VStack(spacing: 12) {
+                        ProgressView().controlSize(.large)
+                        if let p = importProgress {
+                            Text("جاري الاستيراد \(p.done) من \(p.total)")
+                                .font(.footnote.monospacedDigit())
+                            ProgressView(value: Double(p.done), total: Double(max(p.total, 1)))
+                                .frame(width: 180)
+                        }
+                    }
+                    .padding(24)
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+                }
+            }
             .sheet(item: $exportFile) { file in
                 ShareSheet(items: [file.url])
             }
@@ -115,6 +172,32 @@ struct ProfileView: View {
             }
             .alert(message ?? "", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
                 Button("تمام", role: .cancel) {}
+            }
+        }
+    }
+}
+
+extension ProfileView {
+    private func importTVTime(_ urls: [URL]) {
+        isWorking = true
+        importProgress = (0, 0)
+        Task {
+            defer {
+                isWorking = false
+                importProgress = nil
+            }
+            do {
+                let summary = try await TVTimeImporter.run(urls: urls, context: context) { done, total in
+                    importProgress = (done, total)
+                }
+                var text = "تم استيراد \(summary.showsImported) مسلسل و\(summary.episodesMarked) حلقة"
+                if !summary.failedShows.isEmpty {
+                    text += "\n\nما لقيت: " + summary.failedShows.prefix(15).joined(separator: "، ")
+                    if summary.failedShows.count > 15 { text += "…" }
+                }
+                message = text
+            } catch {
+                message = error.localizedDescription
             }
         }
     }

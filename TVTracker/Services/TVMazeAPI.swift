@@ -76,6 +76,20 @@ enum TVMazeAPI {
         try await get(base.appendingPathComponent("shows/\(id)"))
     }
 
+    /// البحث بمعرّف TheTVDB (اللي يستخدمه TV Time)
+    static func lookup(tvdbID: Int) async throws -> TVMazeShow {
+        var comps = URLComponents(url: base.appendingPathComponent("lookup/shows"), resolvingAgainstBaseURL: false)!
+        comps.queryItems = [URLQueryItem(name: "thetvdb", value: String(tvdbID))]
+        return try await get(comps.url!)
+    }
+
+    /// أفضل نتيجة وحدة لاسم المسلسل
+    static func singleSearch(_ name: String) async throws -> TVMazeShow {
+        var comps = URLComponents(url: base.appendingPathComponent("singlesearch/shows"), resolvingAgainstBaseURL: false)!
+        comps.queryItems = [URLQueryItem(name: "q", value: name)]
+        return try await get(comps.url!)
+    }
+
     static func episodes(showID: Int) async throws -> [TVMazeEpisode] {
         let all: [TVMazeEpisode] = try await get(base.appendingPathComponent("shows/\(showID)/episodes"))
         return all.filter { $0.number != nil }
@@ -83,7 +97,7 @@ enum TVMazeAPI {
 
     private static func get<T: Decodable>(_ url: URL, attempt: Int = 0) async throws -> T {
         let (data, response) = try await URLSession.shared.data(from: url)
-        if let http = response as? HTTPURLResponse, http.statusCode == 429, attempt < 3 {
+        if let http = response as? HTTPURLResponse, http.statusCode == 429, attempt < 5 {
             // TVmaze يحد الطلبات؛ ننتظر ونعيد المحاولة
             try await Task.sleep(nanoseconds: UInt64(attempt + 1) * 1_500_000_000)
             return try await get(url, attempt: attempt + 1)

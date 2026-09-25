@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UserNotifications
 
 @main
 struct TVTrackerApp: App {
@@ -7,6 +8,7 @@ struct TVTrackerApp: App {
         // كاش أكبر للصور عشان البوسترات ما تنحمل كل مرة
         URLCache.shared = URLCache(memoryCapacity: 64 * 1024 * 1024,
                                    diskCapacity: 512 * 1024 * 1024)
+        UNUserNotificationCenter.current().delegate = NotificationDelegate.shared
     }
 
     var body: some Scene {
@@ -14,7 +16,7 @@ struct TVTrackerApp: App {
             RootView()
                 .preferredColorScheme(.dark)
         }
-        .modelContainer(for: [Show.self, Episode.self])
+        .modelContainer(SharedStore.container)
     }
 }
 
@@ -35,8 +37,22 @@ struct RootView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
-                Task { await Library.refreshAll(in: context) }
+                Library.applyWidgetMarks(in: context)
+                Task {
+                    await Library.refreshAll(in: context)
+                    await EpisodeNotifications.reschedule(context: context)
+                }
             }
         }
+    }
+}
+
+/// يعرض الإشعار حتى لو التطبيق مفتوح
+final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
+    static let shared = NotificationDelegate()
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
+        [.banner, .sound]
     }
 }

@@ -8,6 +8,9 @@
 - **مسلسلاتي**: شبكة بوسترات مع نسبة التقدم، وفلاتر: أتابعه / محدّث / مكتمل / لاحقاً / توقفت / المفضلة.
 - **صفحة المسلسل**: المواسم والحلقات، تعليم موسم كامل، ضغطة مطوّلة على حلقة ← "شاهدتها وكل اللي قبلها".
 - **حسابي**: الوقت اللي قضيته، عدد الحلقات، آخر ما شاهدت، ونسخ احتياطي (تصدير/استيراد JSON).
+- **ويدجت** للشاشة الرئيسية (صغير/متوسط/كبير) يعرض الحلقات التالية مع زر ✓ تعلّمها منه مباشرة.
+- **إشعارات** وقت نزول الحلقات الجديدة للمسلسلات اللي تتابعها (فعّلها من تبويب حسابي).
+- **استيراد من TV Time**: اطلب نسخة بياناتك من TV Time، واختر ملفات CSV من تبويب حسابي.
 - بيانات المسلسلات من [TVmaze](https://www.tvmaze.com/api) (مجانية وبدون مفتاح). كل بياناتك محفوظة على الجهاز (SwiftData).
 
 المتطلبات: iOS 17 أو أحدث.
@@ -24,7 +27,7 @@ brew install xcodegen
 xcodegen generate
 open TVTracker.xcodeproj
 ```
-1. في Xcode: اختر التارقت ‎TVTracker ← Signing & Capabilities ← اختر الـ Team، وغيّر الـ Bundle Identifier لشيء خاص فيك (مثلاً `com.yourname.tvtracker`).
+1. غيّر `APP_BUNDLE_ID` في `project.yml` لشيء خاص فيك (مثلاً `com.yourname.tvtracker`) وأعد `xcodegen generate`، ثم في Xcode اختر الـ Team للتارقتين (TVTracker و TVTrackerWidget) من Signing & Capabilities. Xcode يسجل الـ App Group تلقائياً.
 2. من [App Store Connect](https://appstoreconnect.apple.com) ← Apps ← ➕ New App، واستخدم نفس الـ Bundle ID.
 3. في Xcode: ‏Product ← Archive ← Distribute App ← TestFlight Internal Only.
 4. بعد دقائق يوصلك في تطبيق TestFlight على الآيفون.
@@ -34,8 +37,9 @@ open TVTracker.xcodeproj
 
 1. ارفع المشروع على مستودع GitHub (يُفضّل خاص/Private).
 2. سجّل الـ Bundle ID وأنشئ التطبيق في App Store Connect (الخطوة 2 فوق). تسجيل الـ Bundle ID يكون من [developer.apple.com ← Identifiers](https://developer.apple.com/account/resources/identifiers/list).
-3. أنشئ مفتاح API: ‏App Store Connect ← Users and Access ← Integrations ← App Store Connect API ← ➕، بصلاحية **Admin**، ونزّل ملف `.p8`.
-4. في GitHub ← Settings ← Secrets and variables ← Actions أضف:
+3. سجّل **App Group** باسم `group.<الـ Bundle ID>` (مثلاً `group.com.yourname.tvtracker`) من developer.apple.com ← Identifiers ← App Groups، وفعّله على الـ App ID حق التطبيق وحق الويدجت (`<Bundle ID>.widget`). هذا يخلي الويدجت يقرأ بياناتك.
+4. أنشئ مفتاح API: ‏App Store Connect ← Users and Access ← Integrations ← App Store Connect API ← ➕، بصلاحية **Admin**، ونزّل ملف `.p8`.
+5. في GitHub ← Settings ← Secrets and variables ← Actions أضف:
 
    | النوع | الاسم | القيمة |
    |---|---|---|
@@ -45,7 +49,7 @@ open TVTracker.xcodeproj
    | Secret | `ASC_KEY_P8_BASE64` | ناتج الأمر `base64 -i AuthKey_XXXX.p8` |
    | Variable | `BUNDLE_ID` | نفس الـ Bundle ID اللي سجلته |
 
-5. من تبويب Actions ← **Upload to TestFlight** ← Run workflow. كل تشغيل يرفع نسخة جديدة برقم بناء أعلى.
+6. من تبويب Actions ← **Upload to TestFlight** ← Run workflow. كل تشغيل يرفع نسخة جديدة برقم بناء أعلى.
 
 ---
 
@@ -54,7 +58,9 @@ open TVTracker.xcodeproj
 TVTracker/
   App/          نقطة البداية والتبويبات
   Models/       Show و Episode (SwiftData)
-  Services/     TVMazeAPI (الشبكة) و Library (الإضافة/التحديث/النسخ الاحتياطي)
+  Services/     TVMazeAPI، Library، الإشعارات، استيراد TV Time
+  Shared/       قاعدة البيانات المشتركة وزر الويدجت (مشتركة مع الويدجت)
   Views/        الشاشات
+TVTrackerWidget/  الويدجت
 project.yml     إعدادات XcodeGen (ملف ‎.xcodeproj يتولد منه)
 ```

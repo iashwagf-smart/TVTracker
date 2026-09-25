@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import WidgetKit
 
 /// كل عمليات الإضافة والتحديث والتعليم كمشاهد
 @MainActor
@@ -26,7 +27,8 @@ enum Library {
         context.insert(show)
         merge(episodes, into: show, in: context)
         show.lastSynced = Date()
-        try? context.save()
+        commit(context)
+        await EpisodeNotifications.reschedule(context: context)
         return show
     }
 
@@ -37,7 +39,7 @@ enum Library {
         apply(r, to: show)
         merge(eps, into: show, in: context)
         show.lastSynced = Date()
-        try? context.save()
+        commit(context)
     }
 
     /// يحدّث المسلسلات اللي ما انتهت (أو كل شيء لو force)
@@ -92,8 +94,29 @@ enum Library {
 
     // MARK: - المشاهدة
 
+    /// يحفظ ويحدّث الويدجت
+    static func commit(_ context: ModelContext?) {
+        try? context?.save()
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    /// يطبّق الحلقات اللي تعلّمت من الويدجت
+    static func applyWidgetMarks(in context: ModelContext) {
+        let marks = SharedStore.takeWidgetMarks()
+        guard !marks.isEmpty else { return }
+        for (id, date) in marks {
+            var descriptor = FetchDescriptor<Episode>(predicate: #Predicate { $0.id == id })
+            descriptor.fetchLimit = 1
+            if let ep = try? context.fetch(descriptor).first, ep.watchedAt == nil {
+                ep.watchedAt = date
+            }
+        }
+        try? context.save()
+    }
+
     static func toggle(_ episode: Episode) {
         episode.watchedAt = episode.isWatched ? nil : Date()
+        commit(episode.modelContext)
     }
 
     static func markWatched(_ episodes: [Episode]) {
@@ -101,10 +124,12 @@ enum Library {
         for ep in episodes where !ep.isWatched && ep.hasAired {
             ep.watchedAt = now
         }
+        commit(episodes.first?.modelContext)
     }
 
     static func markUnwatched(_ episodes: [Episode]) {
         for ep in episodes { ep.watchedAt = nil }
+        commit(episodes.first?.modelContext)
     }
 
     /// يعلّم هذه الحلقة وكل ما قبلها كمشاهدة
@@ -185,7 +210,7 @@ extension Library {
             }
             count += 1
         }
-        try? context.save()
+        commit(context)
         return count
     }
 }
