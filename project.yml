@@ -31,7 +31,7 @@ targets:
     info:
       path: TVTracker/Info.plist
       properties:
-        CFBundleDisplayName: مسلسلاتي
+        CFBundleDisplayName: TVTracker
         CFBundleDevelopmentRegion: ar
         CFBundleLocalizations: [ar]
         CFBundleShortVersionString: $(MARKETING_VERSION)
@@ -68,7 +68,7 @@ targets:
     info:
       path: TVTrackerWidget/Info.plist
       properties:
-        CFBundleDisplayName: مسلسلاتي
+        CFBundleDisplayName: TVTracker Widget
         CFBundleDevelopmentRegion: ar
         CFBundleLocalizations: [ar]
         CFBundleShortVersionString: $(MARKETING_VERSION)
