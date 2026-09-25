@@ -1,0 +1,48 @@
+name: Build unsigned IPA (for SideStore / AltStore)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  ipa:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select latest Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Generate Xcode project
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Build (no signing)
+        run: |
+          xcodebuild archive \
+            -project TVTracker.xcodeproj \
+            -scheme TVTracker \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/TVTracker.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }}
+
+      - name: Package IPA
+        run: |
+          mkdir -p build/Payload
+          cp -R build/TVTracker.xcarchive/Products/Applications/TVTracker.app build/Payload/
+          cd build && zip -qry TVTracker.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TVTracker-ipa
+          path: build/TVTracker.ipa
+          retention-days: 30
